@@ -130,6 +130,7 @@ synpipe/
 - Export predictions in standard formats (SWC, NIFTI)
 
 ---
+For the full project overview, system architecture, and Design Day poster summary, see SYNPIPE_FULL.md.
 
 ## Acknowledgments
 
