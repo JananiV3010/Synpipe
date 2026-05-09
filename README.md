@@ -162,7 +162,9 @@ The full Synpipe pipeline is available in this repository, including Docker cont
 configurations, Hydra orchestration scripts, Flask GUI dashboard, and LAP tracking module.
 
 See `synapsepipe/README.md` for GUI setup instructions.
+
 See `Hydra/README.md` for command-line pipeline usage.
+
 ---
 
 ## Biological Context
@@ -183,8 +185,6 @@ The current implementation covers image restoration, segmentation, and the GUI d
 - Extended validation across diverse imaging datasets and species
 - Export in standard neuroscience formats (SWC, NIfTI)
 - Cross-dataset benchmarking of runtime performance at scale
-
----
 
 ---
 
