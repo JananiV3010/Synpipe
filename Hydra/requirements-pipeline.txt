@@ -1,0 +1,6 @@
+
+# Specifies dependencies required for the pipeline
+
+hydra-core>=1.3,<2
+numpy
+tifffile

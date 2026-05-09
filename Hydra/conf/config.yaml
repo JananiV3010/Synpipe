@@ -1,0 +1,83 @@
+
+# Sets base configuration including this file as the primary config
+
+defaults:
+  - _self_
+
+# Defines input data location, resolution parameters, and file matching patterns
+
+pipeline:
+  input_dir: input_images
+  xy_um_per_pixel: 0.095
+  z_um_per_pixel: 1.0
+  glob_patterns:
+    - "*.tif"
+    - "*.tiff"
+
+# Specifies project directories for inputs, model contexts, and output storage
+
+paths:
+  phoebe_root: ..
+  xtc_context: xtc_copy
+  mrcnn_context: MRCNN
+  xtc_results_root: results/xtc_results
+  mrcnn_results_root: results/mrcnn_results
+  overlay_results_root: results/overlay_results
+  mrcnn_exp_dir: MRCNN/regrcnn_Rsc03_96_96_32_nms02_edited_GN_shifted4_all
+
+# Configures Docker behavior including GPU usage, mounts, and runtime settings
+
+docker:
+  build_images: false
+  use_gpus: true
+  gpus: all
+  container_input_dir: /pipeline/input
+  container_output_dir: /pipeline/output
+  run_as_current_user: true
+  home_dir: /tmp
+  mpl_config_dir: /tmp/mpl
+
+# Controls naming format and prefixes for generated output directories
+
+run:
+  stamp_format: "%Y-%m-%d_%H-%M-%S"
+  xtc_dir_prefix: XTC
+  mrcnn_dir_prefix: MRCNN
+  overlay_dir_prefix: OVERLAY
+
+# Defines XTC container settings, script, and environment variables for processing
+
+xtc:
+  image: xtc:phoebe
+  script: Synapse_detection_and_tracking_FULL_NM.py
+  env:
+    XTC_ONLY_ENHANCE: "1"
+    XTC_SKIP_MATLAB: "1"
+
+# Defines MRCNN container settings, inference script, and experiment directory
+
+mrcnn:
+  image: mrcnn:phoebe
+  script: RegRCNN/inference_sparse_parallel_qin_copy.py
+  container_exp_dir: /app/MRCNN/regrcnn_Rsc03_96_96_32_nms02_edited_GN_shifted4_all
+  device: auto
+  batch_size: 4
+  num_workers: 4
+  pin_memory: true
+
+# Controls optional overlay generation including script and visualization parameters
+
+overlay:
+  enabled: true
+  script: /cis/home/pwu60/qin/little_tools/combine/combine_overlay.py
+  alpha: 0.35
+  threshold: 0.0
+
+# Configures Hydra runtime behavior such as working directory and output handling
+
+hydra:
+  run:
+    dir: .
+  output_subdir: null
+  job:
+    chdir: false
