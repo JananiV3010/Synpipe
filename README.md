@@ -57,10 +57,10 @@ Raw 3D 2P In Vivo Volume
          │
          ▼
 ┌──────────────────────────────────────────────────┐
-│           Tracking System (in development)       │
-│  • Multi-Stage Registration                      │
-│  • Structured Sparse Learning for trajectories   │
-│  Output: Tracked Synapse Trajectories            │
+│           Tracking System                        │
+│  • LAP-based synapse linking across timepoints   │
+│  • Biologically constrained (3.0 µm/frame)       │
+│  • Outputs tracks.csv with trajectory data       │
 └────────┬─────────────────────────────────────────┘
          │
          ▼
@@ -158,10 +158,11 @@ Variable interpolation (e.g., `${pipeline.output_root}`) ensures outputs are org
 
 ## Code Availability
 
-The full Synpipe pipeline — including Docker container configurations, Hydra orchestration scripts, and Flask GUI dashboard — was developed on the Johns Hopkins navon HPC cluster in collaboration with Phoebe Wu and Siyang Qin. Source code is available upon request.
+The full Synpipe pipeline is available in this repository, including Docker container 
+configurations, Hydra orchestration scripts, Flask GUI dashboard, and LAP tracking module.
 
-A standalone simplified demonstration of the core segmentation pipeline is available in this repository as `simplified_synpipe_with_slider_GUI.ipynb`.
-
+See `synapsepipe/README.md` for GUI setup instructions.
+See `Hydra/README.md` for command-line pipeline usage.
 ---
 
 ## Biological Context
@@ -176,9 +177,6 @@ The primary contribution of Synpipe is not new algorithms but reproducible compu
 
 The current implementation covers image restoration, segmentation, and the GUI dashboard. The following are pending or planned:
 
-**In active development**
-- **LAP-based synapse tracking** across timepoints — linking segmented synapses longitudinally to quantify plasticity over days/weeks
-- **ITK-Elastix registration integration** for improved multi-session volume alignment
 
 **Planned**
 - **Docker Compose** for single-command full-stack deployment
