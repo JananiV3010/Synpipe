@@ -1,0 +1,344 @@
+
+# Compares outputs between containerized and non-containerized runs of XTC, MRCNN, and Overlay
+
+import csv
+import sys
+from pathlib import Path
+
+import numpy as np
+from scipy.stats import pearsonr
+from skimage.metrics import structural_similarity as ssim
+from skimage.registration import phase_cross_correlation
+from skimage.transform import resize
+from tifffile import imread
+
+# Defines the base directory for input and output files
+
+BASE_DIR = Path("/cis/home/pwu60")
+
+# Default timestamp for the run to compare against
+
+DEFAULT_RUN_TIMESTAMP = "2026-04-11_09-26-50"
+
+# Resolves MRCNN output path by checking multiple possible locations and returning the first valid match
+
+def resolve_mrcnn_output(run_timestamp: str) -> Path:
+    base = BASE_DIR / f"Phoebe/results/mrcnn_results/MRCNN_{run_timestamp}"
+    candidates = [
+        base
+        / f"XTC_{run_timestamp}_output_check5"
+        / "RSc05_20190211_roi1_green_REGISTERED_XTC_processed_0_segmentation.tif",
+        base
+        / "input_output_check5"
+        / "RSc05_20190211_roi1_green_REGISTERED_XTC_processed_0_segmentation.tif",
+    ]
+
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+
+    return candidates[0]
+
+# Defines comparison pairs between reference outputs and pipeline-generated results for validation
+
+def build_comparisons(run_timestamp: str) -> list[dict[str, Path | str]]:
+    return [
+
+        # for XTC 
+
+        {
+            "label": "XTC processed",
+            "left": BASE_DIR
+            / "qin/test_data/result/RSc05_20190211_roi1_green_REGISTERED_XTC_processed.tif",
+            "right": BASE_DIR
+            / f"Phoebe/results/xtc_results/XTC_{run_timestamp}/RSc05_20190211_roi1_green_REGISTERED_XTC_processed.tif",
+        },
+
+        # for overlay
+
+        {
+            "label": "Overlay",
+            "left": BASE_DIR
+            / "qin/test_data/result/RSc05_20190211_roi1_green_REGISTERED_XTC_processed_overlay.tif",
+            "right": BASE_DIR
+            / f"Phoebe/results/overlay_results/OVERLAY_{run_timestamp}/RSc05_20190211_roi1_green_REGISTERED_XTC_processed_overlay.tif",
+        },
+
+        # for MRCNN 
+
+        {
+            "label": "MRCNN segmentation",
+            "left": BASE_DIR
+            / "qin/test_data/result/RSc05_20190211_roi1_green_REGISTERED_XTC_processed_0_segmentation.tif",
+            "right": resolve_mrcnn_output(run_timestamp),
+        },
+    ]
+
+# Constructs the output path for saving comparison metrics as a timestamped CSV file
+
+def build_output_csv(run_timestamp: str) -> Path:
+    return (
+        BASE_DIR
+        / f"Phoebe/results/comparison_results/comparison_metrics_{run_timestamp}.csv"
+    )
+
+# Loads an image, converts it to grayscale, reduces it to 2D, and normalizes intensity values for comparison
+
+def load_image(path: Path) -> np.ndarray:
+    image = imread(path).astype(np.float32)
+
+    # Convert RGB-style overlays to a single comparable intensity image
+    if image.ndim >= 3 and image.shape[-1] in (3, 4):
+        image = image.mean(axis=-1)
+
+    # Collapse stack dimensions into one comparable 2D projection
+    while image.ndim > 2:
+        image = image.max(axis=0)
+
+    if image.ndim != 2:
+        raise ValueError(f"Expected a 2D image after loading {path}, got shape {image.shape}")
+
+    image_min = float(image.min())
+    image_max = float(image.max())
+
+    if image_max > image_min:
+        image = (image - image_min) / (image_max - image_min)
+    else:
+        image = np.zeros_like(image, dtype=np.float32)
+
+    return image
+
+# Matches image shapes by resizing the second image to the first and flags if resizing was applied
+
+def match_shapes(
+    left: np.ndarray, right: np.ndarray
+) -> tuple[np.ndarray, np.ndarray, tuple[int, int], bool]:
+    target_shape = left.shape
+    resized = False
+
+    if right.shape != target_shape:
+        right = resize(
+            right,
+            target_shape,
+            order=1,
+            preserve_range=True,
+            anti_aliasing=True,
+        ).astype(np.float32)
+        resized = True
+
+    return left, right, target_shape, resized
+
+# Computes SSIM, Pearson correlation, and MSE to quantify similarity between two images
+
+def compute_metrics(left: np.ndarray, right: np.ndarray) -> dict[str, float]:
+    data_range = 1.0
+
+    # SSIM
+
+    ssim_value = ssim(left, right, data_range=data_range)
+
+    # Pearson
+
+    left_flat = left.ravel()
+    right_flat = right.ravel()
+
+    if np.std(left_flat) == 0.0 and np.std(right_flat) == 0.0:
+        pearson_value = 1.0
+    elif np.std(left_flat) == 0.0 or np.std(right_flat) == 0.0:
+        pearson_value = 0.0
+    else:
+        pearson_value = pearsonr(left_flat, right_flat).statistic
+
+    # MSE
+
+    mse_value = float(np.mean((left - right) ** 2))
+
+    return {
+        "ssim": float(ssim_value),
+        "pearson": float(pearson_value),
+        "mse": mse_value,
+    }
+
+# Estimates spatial shift between two images using phase cross-correlation and returns displacement and error metrics
+
+def estimate_shift(left: np.ndarray, right: np.ndarray) -> dict[str, float]:
+    shift, error, _ = phase_cross_correlation(left, right, upsample_factor=10)
+    row_shift = float(shift[0])
+    col_shift = float(shift[1])
+    magnitude = float(np.hypot(row_shift, col_shift))
+
+    return {
+        "shift_row": row_shift,
+        "shift_col": col_shift,
+        "shift_magnitude": magnitude,
+        "shift_error": float(error),
+    }
+
+# Loads, aligns, and compares two images while computing similarity and shift metrics
+
+def compare_images(label: str, left_path: Path, right_path: Path) -> dict[str, str | float]:
+    if not left_path.exists():
+        raise FileNotFoundError(f"Missing left image: {left_path}")
+    if not right_path.exists():
+        raise FileNotFoundError(f"Missing right image: {right_path}")
+
+    left_image = load_image(left_path)
+    right_image = load_image(right_path)
+    left_shape = left_image.shape
+    right_shape = right_image.shape
+    left_image, right_image, compared_shape, resized = match_shapes(left_image, right_image)
+
+    metrics = compute_metrics(left_image, right_image)
+    shift_metrics = estimate_shift(left_image, right_image)
+    
+    # output metrics 
+    return {
+        "comparison": label,
+        "left_image": str(left_path),
+        "right_image": str(right_path),
+        "left_shape": f"{left_shape[0]}x{left_shape[1]}",
+        "right_shape": f"{right_shape[0]}x{right_shape[1]}",
+        "compared_shape": f"{compared_shape[0]}x{compared_shape[1]}",
+        "right_resized": str(resized),
+        "ssim": metrics["ssim"],
+        "pearson": metrics["pearson"],
+        "mse": metrics["mse"],
+        "shift_row": shift_metrics["shift_row"],
+        "shift_col": shift_metrics["shift_col"],
+        "shift_magnitude": shift_metrics["shift_magnitude"],
+        "shift_error": shift_metrics["shift_error"],
+    }
+
+# Returns a placeholder result with a skip status and notes when one or both images are missing
+
+def missing_result(label: str, left_path: Path, right_path: Path) -> dict[str, str]:
+    note_parts = []
+    if not left_path.exists():
+        note_parts.append(f"missing left image: {left_path}")
+    if not right_path.exists():
+        note_parts.append(f"missing right image: {right_path}")
+
+    # output metrics 
+    return {
+        "comparison": label,
+        "left_image": str(left_path),
+        "right_image": str(right_path),
+        "left_shape": "",
+        "right_shape": "",
+        "compared_shape": "",
+        "right_resized": "",
+        "ssim": "",
+        "pearson": "",
+        "mse": "",
+        "shift_row": "",
+        "shift_col": "",
+        "shift_magnitude": "",
+        "shift_error": "",
+        "status": "skipped",
+        "note": "; ".join(note_parts),
+    }
+
+# Writes comparison results to a CSV file
+
+def write_results(results: list[dict[str, str | float]], output_csv: Path) -> None:
+    output_csv.parent.mkdir(parents=True, exist_ok=True)
+
+    with output_csv.open("w", newline="") as handle:
+        writer = csv.writer(handle)
+
+        header = ["metric"] + [str(result["comparison"]) for result in results]
+        writer.writerow(header)
+
+        # output metrics 
+        metric_rows = [
+            ("Left size", "left_shape"),
+            ("Right size", "right_shape"),
+            ("Compared", "compared_shape"),
+            ("Resized", "right_resized"),
+            ("SSIM", "ssim"),
+            ("Pearson", "pearson"),
+            ("MSE", "mse"),
+            ("Shift row", "shift_row"),
+            ("Shift col", "shift_col"),
+            ("Shift mag", "shift_magnitude"),
+            ("Shift err", "shift_error"),
+            ("Status", "status"),
+            ("Note", "note"),
+        ]
+
+        for row_label, key in metric_rows:
+            row = [row_label]
+            for result in results:
+                value = result.get(key, "")
+                if isinstance(value, float):
+                    if key in {"ssim", "pearson", "mse", "shift_error"}:
+                        row.append(f"{value:.6f}")
+                    else:
+                        row.append(f"{value:.3f}")
+                else:
+                    row.append(str(value))
+            writer.writerow(row)
+
+# Builds comparison tasks, checks for missing files, computes metrics for available images
+
+def main() -> None:
+    run_timestamp = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_RUN_TIMESTAMP
+    comparisons = build_comparisons(run_timestamp)
+    output_csv = build_output_csv(run_timestamp)
+    results = []
+
+    for comparison in comparisons:
+        left_path = comparison["left"]
+        right_path = comparison["right"]
+
+        if not left_path.exists() or not right_path.exists():
+            results.append(
+                missing_result(
+                    label=comparison["label"],
+                    left_path=left_path,
+                    right_path=right_path,
+                )
+            )
+            continue
+
+        result = compare_images(
+            label=comparison["label"],
+            left_path=left_path,
+            right_path=right_path,
+        )
+        result["status"] = "completed"
+        result["note"] = ""
+        results.append(result)
+    
+    # Print results 
+    for result in results:
+        if result["status"] != "completed":
+            print(f"\nComparison: {result['comparison']}")
+            print("Status:    skipped")
+            print(f"Note:      {result['note']}")
+            continue
+
+        print(f"\nComparison: {result['comparison']}")
+        print(f"Left:      {result['left_image']}")
+        print(f"Right:     {result['right_image']}")
+        print(f"Left size: {result['left_shape']}")
+        print(f"Right size:{result['right_shape']}")
+        print(f"Compared:  {result['compared_shape']}")
+        print(f"Resized:   {result['right_resized']}")
+        print(f"SSIM:      {result['ssim']:.6f}")
+        print(f"Pearson:   {result['pearson']:.6f}")
+        print(f"MSE:       {result['mse']:.6f}")
+        print(f"Shift row: {result['shift_row']:.3f}")
+        print(f"Shift col: {result['shift_col']:.3f}")
+        print(f"Shift mag: {result['shift_magnitude']:.3f}")
+        print(f"Shift err: {result['shift_error']:.6f}")
+
+    # Saves to a CSV file
+
+    write_results(results, output_csv)
+    print(f"\nSaved comparison metrics to: {output_csv}")
+
+# Executes the main comparison workflow when the script is run directly
+
+if __name__ == "__main__":
+    main()
