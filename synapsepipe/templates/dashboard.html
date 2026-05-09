@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Synpipe · JHU BME</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy:#1B3A6B;
+  --blue:#2563EB;
+  --blue-light:#DBEAFE;
+  --blue-mid:#BFDBFE;
+  --bg:#F8FAFC;
+  --surface:#FFFFFF;
+  --surface2:#F1F5F9;
+  --border:#E2E8F0;
+  --border2:#CBD5E1;
+  --text:#1E293B;
+  --muted:#64748B;
+  --subtle:#94A3B8;
+  --accent:#1B3A6B;
+  --accent-bg:#EFF6FF;
+  --accent-border:#BFDBFE;
+  --ok:#166534;
+  --ok-bg:#F0FDF4;
+  --ok-border:#BBF7D0;
+  --warn:#92600A;
+  --warn-bg:#FFFBEB;
+  --warn-border:#FDE68A;
+  --err:#991B1B;
+  --err-bg:#FEF2F2;
+  --err-border:#FECACA;
+  --mono:'JetBrains Mono',monospace;
+  --sans:'Inter',sans-serif;
+  --radius:6px;
+  --radius-lg:10px;
+}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.5;min-height:100vh}
+
+/* HEADER */
+.header{display:flex;align-items:center;justify-content:space-between;padding:0 28px;height:54px;background:var(--navy);position:sticky;top:0;z-index:100}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-mark{width:26px;height:26px;border-radius:5px;background:rgba(255,255,255,0.15);display:flex;align-items:center;justify-content:center}
+.logo-mark svg{width:14px;height:14px;fill:white}
+.logo-name{font-size:15px;font-weight:600;color:white;letter-spacing:-0.01em}
+.logo-sep{color:rgba(255,255,255,0.3);margin:0 8px}
+.logo-sub{font-size:12px;color:rgba(255,255,255,0.6)}
+.header-right{display:flex;align-items:center;gap:20px;font-size:12px}
+.conn-badge{display:flex;align-items:center;gap:6px;color:rgba(255,255,255,0.7)}
+.conn-dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,0.3)}
+.conn-dot.live{background:#4ADE80;animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+.header-meta{color:rgba(255,255,255,0.5);font-family:var(--mono);font-size:11px}
+.header-meta span{color:rgba(255,255,255,0.85)}
+
+/* LAYOUT */
+.main{display:grid;grid-template-columns:260px 1fr;height:calc(100vh - 54px)}
+.sidebar{background:var(--surface);border-right:1px solid var(--border);overflow-y:auto;display:flex;flex-direction:column}
+.content-area{overflow-y:auto;background:var(--bg)}
+
+/* SIDEBAR */
+.sidebar-section{padding:16px;border-bottom:1px solid var(--border)}
+.sidebar-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:var(--subtle);margin-bottom:10px}
+.stage-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:var(--radius);margin-bottom:2px;cursor:pointer;transition:background 0.1s;border:1px solid transparent}
+.stage-item:hover{background:var(--surface2)}
+.stage-item.active{background:var(--accent-bg);border-color:var(--accent-border)}
+.stage-item.done .stage-num{background:var(--navy);border-color:var(--navy);color:white}
+.stage-num{width:22px;height:22px;border-radius:50%;border:1.5px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--muted);flex-shrink:0;transition:all 0.2s}
+.stage-item.active .stage-num{border-color:var(--navy);color:var(--navy)}
+.stage-meta{flex:1;min-width:0}
+.stage-name{font-size:13px;font-weight:500;color:var(--text)}
+.stage-tool{font-size:11px;color:var(--muted);font-family:var(--mono);margin-top:1px}
+.stage-pip{width:7px;height:7px;border-radius:50%;background:var(--border2);flex-shrink:0}
+.stage-pip.running{background:var(--blue);animation:pulse 1s ease-in-out infinite}
+.stage-pip.done{background:#16A34A}
+.stage-pip.error{background:var(--err)}
+.stage-pip.queued{background:var(--warn)}
+
+/* STATS */
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.stat-card{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:10px}
+.stat-val{font-family:var(--mono);font-size:18px;font-weight:600;color:var(--navy);line-height:1}
+.stat-lbl{font-size:10px;color:var(--muted);margin-top:3px;text-transform:uppercase;letter-spacing:0.06em}
+
+/* JOBS */
+.job-row{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:var(--radius);background:var(--bg);border:1px solid var(--border);margin-bottom:4px;font-family:var(--mono);font-size:11px}
+.job-id{color:var(--muted);min-width:48px}
+.job-name{color:var(--text);flex:1}
+.pill{padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;letter-spacing:0.02em}
+.pill-green{background:var(--ok-bg);color:var(--ok);border:1px solid var(--ok-border)}
+.pill-blue{background:var(--blue-light);color:var(--navy);border:1px solid var(--blue-mid)}
+.pill-amber{background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn-border)}
+.pill-gray{background:var(--surface2);color:var(--muted);border:1px solid var(--border)}
+.pill-red{background:var(--err-bg);color:var(--err);border:1px solid var(--err-border)}
+
+/* TABS */
+.tab-bar{display:flex;border-bottom:1px solid var(--border);background:var(--surface);padding:0 24px}
+.tab{font-size:13px;font-weight:500;color:var(--muted);padding:13px 14px;cursor:pointer;border-bottom:2px solid transparent;transition:all 0.15s;margin-bottom:-1px}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--navy);border-bottom-color:var(--navy)}
+
+/* CONTENT */
+.tab-pane{display:none}.tab-pane.active{display:block}
+.content-inner{padding:24px}
+
+/* CARDS */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;margin-bottom:14px}
+.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.card-title{font-size:14px;font-weight:600;color:var(--navy);display:flex;align-items:center;gap:8px}
+.status-tag{font-family:var(--mono);font-size:11px;padding:3px 9px;border-radius:4px;font-weight:500}
+.card-tool{font-size:11px;color:var(--muted);font-family:var(--mono)}
+
+/* FORM */
+.config-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.form-group label{display:block;font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px}
+.form-group input,.form-group select{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:6px 10px;color:var(--text);font-family:var(--mono);font-size:12px;outline:none;transition:border-color 0.15s}
+.form-group input:focus,.form-group select:focus{border-color:var(--navy);background:white}
+.form-group input[readonly]{color:var(--muted);background:var(--surface2)}
+.form-group select option{background:white}
+
+/* PROGRESS */
+.progress-wrap{background:var(--surface2);border-radius:3px;height:4px;overflow:hidden;margin:12px 0 6px}
+.progress-bar{height:100%;border-radius:3px;background:var(--navy);transition:width 0.6s ease}
+.progress-info{font-family:var(--mono);font-size:10px;color:var(--muted)}
+
+/* BUTTONS */
+.btn-row{display:flex;gap:8px;margin-top:14px}
+.btn{font-family:var(--sans);font-size:12px;font-weight:500;padding:7px 14px;border-radius:var(--radius);border:1px solid var(--border);cursor:pointer;transition:all 0.15s;background:var(--surface);color:var(--text)}
+.btn:hover{background:var(--surface2);border-color:var(--border2)}
+.btn-primary{background:var(--navy);color:white;border-color:var(--navy)}
+.btn-primary:hover{background:#152D55}
+.btn-danger{color:var(--err);border-color:var(--err-border)}
+.btn-danger:hover{background:var(--err-bg)}
+
+/* RESULTS */
+.results-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+.result-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px}
+.result-accent{width:100%;height:3px;border-radius:2px;margin-bottom:12px;background:var(--navy)}
+.result-label{font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px}
+.result-big{font-family:var(--mono);font-size:28px;font-weight:600;line-height:1;color:var(--navy);margin-bottom:4px}
+.result-sub{font-size:11px;color:var(--muted)}
+
+/* LOGS */
+.log-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+.log-toolbar{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--surface2)}
+.log-toolbar-title{font-size:12px;font-weight:600;color:var(--muted)}
+.log-body{padding:12px 14px;font-family:var(--mono);font-size:11px;line-height:1.8;max-height:calc(100vh - 240px);overflow-y:auto}
+.log-line{display:flex;gap:10px}
+.log-time{color:var(--subtle);flex-shrink:0;min-width:58px}
+.log-stage{color:var(--muted);flex-shrink:0;min-width:90px}
+.log-msg{color:var(--text)}
+.log-msg.ok{color:var(--ok)}
+.log-msg.warn{color:var(--warn)}
+.log-msg.error{color:var(--err)}
+.log-msg.info{color:var(--navy)}
+.log-msg.dim{color:var(--muted)}
+
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:10px}
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="logo">
+    <div class="logo-mark">
+      <svg viewBox="0 0 14 14"><circle cx="7" cy="4" r="2.5"/><circle cx="3" cy="10" r="1.8"/><circle cx="11" cy="10" r="1.8"/><line x1="7" y1="6.5" x2="3" y2="8.2" stroke="white" stroke-width="1" fill="none"/><line x1="7" y1="6.5" x2="11" y2="8.2" stroke="white" stroke-width="1" fill="none"/></svg>
+    </div>
+    <span class="logo-name">Synpipe</span>
+    <span class="logo-sep">·</span>
+    <span class="logo-sub">Synapse Detection Pipeline</span>
+  </div>
+  <div class="header-right">
+    <div class="conn-badge">
+      <div class="conn-dot" id="conn-dot"></div>
+      <span id="conn-status">connecting…</span>
+    </div>
+    
+    
+    <div class="header-meta" id="clock">--:--:--</div>
+  </div>
+</header>
+
+<div class="main">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">Pipeline Stages</div>
+
+      <div class="stage-item active" onclick="selectStage('registration')" id="si-registration">
+        <div class="stage-num">1</div>
+        <div class="stage-meta">
+          <div class="stage-name">Registration</div>
+          <div class="stage-tool">ITK-Elastix</div>
+        </div>
+        <div class="stage-pip" id="sd-registration"></div>
+      </div>
+
+      <div class="stage-item" onclick="selectStage('restoration')" id="si-restoration">
+        <div class="stage-num">2</div>
+        <div class="stage-meta">
+          <div class="stage-name">Restoration</div>
+          <div class="stage-tool">XTC · Docker</div>
+        </div>
+        <div class="stage-pip" id="sd-restoration"></div>
+      </div>
+
+      <div class="stage-item" onclick="selectStage('segmentation')" id="si-segmentation">
+        <div class="stage-num">3</div>
+        <div class="stage-meta">
+          <div class="stage-name">Segmentation</div>
+          <div class="stage-tool">MRCNN · Docker · Hydra</div>
+        </div>
+        <div class="stage-pip" id="sd-segmentation"></div>
+      </div>
+
+      <div class="stage-item" onclick="selectStage('tracking')" id="si-tracking">
+        <div class="stage-num">4</div>
+        <div class="stage-meta">
+          <div class="stage-name">Tracking</div>
+          <div class="stage-tool">LAP · Python</div>
+        </div>
+        <div class="stage-pip" id="sd-tracking"></div>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">Metrics</div>
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-val" id="stat-sens">—</div><div class="stat-lbl">Sensitivity</div></div>
+        <div class="stat-card"><div class="stat-val" id="stat-objs">—</div><div class="stat-lbl">Objects</div></div>
+        <div class="stat-card"><div class="stat-val" id="stat-snr">—</div><div class="stat-lbl">SNR (dB)</div></div>
+        <div class="stat-card"><div class="stat-val" id="stat-prec">—</div><div class="stat-lbl">Precision</div></div>
+      </div>
+    </div>
+
+    <div class="sidebar-section" style="border-bottom:none;flex:1">
+      <div class="sidebar-label">Recent Jobs</div>
+      <div id="jobs-list"><div style="font-size:12px;color:var(--muted)">No jobs yet</div></div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="content-area">
+    <div class="tab-bar">
+      <div class="tab active" onclick="switchTab('controls',this)">Pipeline Controls</div>
+      <div class="tab" onclick="switchTab('results',this)">Results</div>
+      <div class="tab" onclick="switchTab('logs',this)">System Logs</div>
+    </div>
+
+    <!-- CONTROLS TAB -->
+    <div class="tab-pane active" id="tab-controls">
+      <div class="content-inner">
+
+        <!-- REGISTRATION -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">
+              1 — Registration
+              <span class="status-tag pill-gray" id="tag-registration">Idle</span>
+            </div>
+            <span class="card-tool">ITK-Elastix</span>
+          </div>
+          <div class="config-grid">
+            <div class="form-group">
+              <label>Fixed Image</label>
+              <input id="reg-fixed" value="/cis/home/pwu60/Phoebe/test_data/RSc03_20181211_4x__roi3_Green.tif">
+            </div>
+            <div class="form-group">
+              <label>Moving Image</label>
+              <input id="reg-moving" value="/cis/home/pwu60/Phoebe/test_data/RSc05_20190211_roi1_green.tif">
+            </div>
+            <div class="form-group">
+              <label>Transform</label>
+              <select id="reg-transform"><option>BSpline</option><option>Rigid</option><option>Affine</option></select>
+            </div>
+            <div class="form-group">
+              <label>Resolution</label>
+              <input value="0.095 µm/px XY · 1.0 µm/px Z" readonly>
+            </div>
+          </div>
+          <div class="progress-wrap"><div class="progress-bar" id="prog-registration" style="width:0%"></div></div>
+          <div class="progress-info"><span id="msg-registration">Ready</span></div>
+          <div class="btn-row">
+            <button class="btn btn-primary" onclick="runStage('registration')">Run stage</button>
+            <button class="btn btn-danger" onclick="stopStage('registration')">Stop</button>
+          </div>
+        </div>
+
+        <!-- RESTORATION -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">
+              2 — Restoration
+              <span class="status-tag pill-gray" id="tag-restoration">Idle</span>
+            </div>
+            <span class="card-tool">XTC · Docker</span>
+          </div>
+          <div class="config-grid">
+            <div class="form-group">
+              <label>Input Image</label>
+              <input id="res-input" value="/cis/home/pwu60/Phoebe/test_data/RSc05_20190211_roi1_green.tif">
+            </div>
+            <div class="form-group">
+              <label>Output Dir</label>
+              <input id="res-output" value="/cis/home/pwu60/synapsepipe_results/xtc_results" readonly>
+            </div>
+            <div class="form-group">
+              <label>XY Resolution (µm/px)</label>
+              <input value="0.095" readonly>
+            </div>
+            <div class="form-group">
+              <label>Z Resolution (µm/px)</label>
+              <input value="1.0" readonly>
+            </div>
+          </div>
+          <div class="progress-wrap"><div class="progress-bar" id="prog-restoration" style="width:0%"></div></div>
+          <div class="progress-info"><span id="msg-restoration">Ready</span></div>
+          <div class="btn-row">
+            <button class="btn btn-primary" onclick="runStage('restoration')">Run stage</button>
+            <button class="btn btn-danger" onclick="stopStage('restoration')">Stop</button>
+          </div>
+        </div>
+
+        <!-- SEGMENTATION -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">
+              3 — Segmentation
+              <span class="status-tag pill-gray" id="tag-segmentation">Idle</span>
+            </div>
+            <span class="card-tool">MRCNN · Docker · Hydra</span>
+          </div>
+          <div class="config-grid">
+            <div class="form-group">
+              <label>Input Image</label>
+              <input id="seg-input" value="/cis/home/pwu60/Phoebe/test_data/RSc05_20190211_roi1_green.tif">
+            </div>
+            <div class="form-group">
+              <label>Output Dir</label>
+              <input id="seg-output" value="/cis/home/pwu60/synapsepipe_results/mrcnn_results" readonly>
+            </div>
+            <div class="form-group">
+              <label>Min Object Size (px³)</label>
+              <input id="seg-minsize" type="number" value="20">
+            </div>
+            <div class="form-group">
+              <label>Max Object Size (px³)</label>
+              <input id="seg-maxsize" type="number" value="150">
+            </div>
+          </div>
+          <div class="progress-wrap"><div class="progress-bar" id="prog-segmentation" style="width:0%"></div></div>
+          <div class="progress-info"><span id="msg-segmentation">Ready</span></div>
+          <div class="btn-row">
+            <button class="btn btn-primary" onclick="runStage('segmentation')">Run stage</button>
+            <button class="btn btn-danger" onclick="stopStage('segmentation')">Stop</button>
+            <button class="btn" onclick="window.open('/api/results/plot/validation')">View plot</button>
+          </div>
+        </div>
+
+        <!-- TRACKING -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">
+              4 — Tracking
+              <span class="status-tag pill-gray" id="tag-tracking">Idle</span>
+            </div>
+            <span class="card-tool">LAP · Python</span>
+          </div>
+          <div class="config-grid">
+            <div class="form-group">
+              <label>Segmentation Dir</label>
+              <input id="trk-segdir" value="/cis/home/pwu60/synapsepipe_results/mrcnn_results">
+            </div>
+            <div class="form-group">
+              <label>Output Dir</label>
+              <input id="trk-output" value="/cis/home/pwu60/synapsepipe_results/tracking" readonly>
+            </div>
+            <div class="form-group">
+              <label>Max Displacement (µm)</label>
+              <input id="trk-disp" type="number" value="3.0" step="0.5">
+            </div>
+            <div class="form-group">
+              <label>Max Gap Frames</label>
+              <input id="trk-gap" type="number" value="2">
+            </div>
+          </div>
+          <div class="progress-wrap"><div class="progress-bar" id="prog-tracking" style="width:0%"></div></div>
+          <div class="progress-info"><span id="msg-tracking">Ready</span></div>
+          <div class="btn-row">
+            <button class="btn btn-primary" onclick="runStage('tracking')">Run stage</button>
+            <button class="btn btn-danger" onclick="stopStage('tracking')">Stop</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- RESULTS TAB -->
+    <div class="tab-pane" id="tab-results">
+      <div class="content-inner">
+        <div class="results-grid">
+          <div class="result-card">
+            <div class="result-accent"></div>
+            <div class="result-label">Detection Sensitivity</div>
+            <div class="result-big" id="r-sens">—</div>
+            <div class="result-sub">Post SynapseFilter · RSc05 dataset</div>
+          </div>
+          <div class="result-card">
+            <div class="result-accent" style="background:#2563EB"></div>
+            <div class="result-label">Precision</div>
+            <div class="result-big" id="r-prec">—</div>
+            <div class="result-sub">Valid synapses / total candidates</div>
+          </div>
+          <div class="result-card">
+            <div class="result-accent" style="background:#0369A1"></div>
+            <div class="result-label">Objects Detected</div>
+            <div class="result-big" id="r-objs">—</div>
+            <div class="result-sub">MRCNN · all timepoints</div>
+          </div>
+          <div class="result-card">
+            <div class="result-accent" style="background:#1E40AF"></div>
+            <div class="result-label">Tracks</div>
+            <div class="result-big" id="r-tracks">—</div>
+            <div class="result-sub">LAP tracker · linked across frames</div>
+          </div>
+        </div>
+
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px">
+          <div style="font-size:13px;font-weight:600;margin-bottom:10px;color:var(--muted)">Validation Plot</div>
+          <img id="val-plot" src="/api/results/plot/validation"
+               style="width:100%;border-radius:6px;display:none"
+               onload="this.style.display='block'"
+               onerror="this.style.display='none'">
+          <div id="no-plot" style="font-size:12px;color:var(--muted);font-family:var(--mono)">
+            Run segmentation to generate validation plot.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LOGS TAB -->
+    <div class="tab-pane" id="tab-logs">
+      <div class="content-inner">
+        <div class="log-wrap">
+          <div class="log-toolbar">
+            <span class="log-toolbar-title">Live output</span>
+            <button class="btn" style="padding:4px 10px;font-size:11px"
+                    onclick="document.getElementById('log-body').innerHTML=''">Clear</button>
+          </div>
+          <div class="log-body" id="log-body">
+            <div class="log-line">
+              <span class="log-time">--:--:--</span>
+              <span class="log-msg dim">Connecting to backend…</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// Clock
+setInterval(()=>{
+  document.getElementById('clock').textContent =
+    new Date().toLocaleTimeString('en-US',{hour12:false});
+},1000);
+
+// Tab switch
+function switchTab(name,el){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-'+name).classList.add('active');
+}
+
+// Stage select
+function selectStage(key){
+  document.querySelectorAll('.stage-item').forEach(s=>s.classList.remove('active'));
+  document.getElementById('si-'+key).classList.add('active');
+}
+
+// Status map
+const STATUS={
+  idle:   {pill:'pill-gray',  txt:'Idle',    pip:''},
+  queued: {pill:'pill-amber', txt:'Queued',  pip:'queued'},
+  running:{pill:'pill-blue',  txt:'Running', pip:'running'},
+  done:   {pill:'pill-green', txt:'Done',    pip:'done'},
+  error:  {pill:'pill-red',   txt:'Error',   pip:'error'},
+};
+
+// Poll backend every 2s
+async function pollStatus(){
+  try{
+    const r = await fetch('/api/status');
+    if(!r.ok) throw new Error();
+    const data = await r.json();
+
+    document.getElementById('conn-status').textContent = 'navon · connected';
+    document.getElementById('conn-dot').classList.add('live');
+
+    for(const [key, stage] of Object.entries(data.stages)){
+      const s = STATUS[stage.status] || STATUS.idle;
+      const tag = document.getElementById('tag-'+key);
+      if(tag){ tag.className='status-tag '+s.pill; tag.textContent=s.txt; }
+      const pip = document.getElementById('sd-'+key);
+      if(pip){ pip.className='stage-pip'; if(s.pip) pip.classList.add(s.pip); }
+      const si = document.getElementById('si-'+key);
+      if(si && stage.status==='done') si.classList.add('done');
+      const pb = document.getElementById('prog-'+key);
+      if(pb) pb.style.width = (stage.progress||0)+'%';
+      const msg = document.getElementById('msg-'+key);
+      if(msg) msg.textContent = stage.message || 'Ready';
+    }
+
+    const res = data.results;
+    const fmt = (v,pct) => v!=null ? (pct?(v*100).toFixed(0)+'%':v.toLocaleString()) : '—';
+    document.getElementById('stat-sens').textContent = fmt(res.sensitivity, true);
+    document.getElementById('stat-prec').textContent = fmt(res.precision, true);
+    document.getElementById('stat-snr').textContent  = res.snr_improvement!=null ? '+'+res.snr_improvement+' dB' : '—';
+    document.getElementById('stat-objs').textContent = fmt(res.objects_detected, false);
+    document.getElementById('r-sens').textContent    = fmt(res.sensitivity, true);
+    document.getElementById('r-prec').textContent    = fmt(res.precision, true);
+    document.getElementById('r-objs').textContent    = fmt(res.objects_detected, false);
+    document.getElementById('r-tracks').textContent  = res.tracks!=null ? res.tracks.toLocaleString() : '—';
+
+    const jl = document.getElementById('jobs-list');
+    if(data.jobs.length){
+      jl.innerHTML = data.jobs.slice(0,5).map(j=>`
+        <div class="job-row">
+          <span class="job-id">${j.id}</span>
+          <span class="job-name">${j.stage}</span>
+          <span class="pill ${j.status==='running'?'pill-blue':j.status==='done'?'pill-green':'pill-gray'}">
+            ${j.status}
+          </span>
+        </div>`).join('');
+    }
+
+  }catch(e){
+    document.getElementById('conn-status').textContent = 'disconnected';
+    document.getElementById('conn-dot').classList.remove('live');
+  }
+}
+setInterval(pollStatus, 2000);
+pollStatus();
+
+// SSE live logs
+const evtSrc = new EventSource('/api/logs/stream');
+const logEl  = document.getElementById('log-body');
+logEl.innerHTML = '';
+evtSrc.onmessage = (e)=>{
+  const d = JSON.parse(e.data);
+  if(d.ping) return;
+  const cls = d.level==='OK'    ? 'ok'
+            : d.level==='WARN'  ? 'warn'
+            : d.level==='ERROR' ? 'error'
+            : d.level==='INFO'  ? 'info' : 'dim';
+  const line = document.createElement('div');
+  line.className = 'log-line';
+  line.innerHTML = `<span class="log-time">${d.time}</span>`
+                 + `<span class="log-stage">[${d.stage}]</span>`
+                 + `<span class="log-msg ${cls}">${d.msg}</span>`;
+  logEl.appendChild(line);
+  logEl.scrollTop = logEl.scrollHeight;
+};
+
+// Run / Stop
+async function runStage(key){
+  const params = gatherParams(key);
+  const r = await fetch('/api/run/'+key,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(params)
+  });
+  const d = await r.json();
+  if(!r.ok) alert(d.error || 'Error starting stage');
+}
+
+async function stopStage(key){
+  const r = await fetch('/api/stop/'+key,{method:'POST'});
+  const d = await r.json();
+  if(!r.ok) alert(d.error || 'Could not stop');
+}
+
+function gatherParams(key){
+  if(key==='registration') return {
+    fixed:     document.getElementById('reg-fixed').value,
+    moving:    document.getElementById('reg-moving').value,
+    transform: document.getElementById('reg-transform').value,
+  };
+  if(key==='restoration') return {
+    input:  document.getElementById('res-input').value,
+    output: document.getElementById('res-output').value,
+  };
+  if(key==='segmentation') return {
+    input:    document.getElementById('seg-input').value,
+    output:   document.getElementById('seg-output').value,
+    min_size: parseInt(document.getElementById('seg-minsize').value),
+    max_size: parseInt(document.getElementById('seg-maxsize').value),
+  };
+  if(key==='tracking') return {
+    seg_dir:      document.getElementById('trk-segdir').value,
+    output:       document.getElementById('trk-output').value,
+    max_disp:     parseFloat(document.getElementById('trk-disp').value),
+    max_gap:      parseInt(document.getElementById('trk-gap').value),
+  };
+  return {};
+}
+</script>
+</body>
+</html>
